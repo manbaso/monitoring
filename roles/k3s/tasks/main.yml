@@ -1,0 +1,51 @@
+- name: Install required packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - apt-transport-https
+    - software-properties-common
+    - wget
+
+- name: Check if k3s.yaml exists
+  stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: k3s_yaml
+
+- name: Download and execute K3s installation script
+  shell: "curl -sfL https://get.k3s.io | sh -s -- --write-kubeconfig-mode 664"
+  when: k3s_yaml.stat.exists == False
+
+# - name: Move kube directory to /home/ubuntu
+#   ansible.builtin.copy:
+#     src: kube  # Specify the source directory
+#     dest: /home/ubuntu/  
+
+- name: Add Helm GPG key
+  shell: curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+  
+
+
+- name: Add Helm repository
+  shell: echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+  
+
+- name: Update apt packages
+  apt:
+    update_cache: yes
+
+- name: Install Helm
+  apt:
+    name: helm
+    state: present
+
+- name: Apply Ingress controller manifest
+  shell: |
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.44.0/deploy/static/provider/cloud/deploy.yaml
+
+- name: Set KUBECONFIG environment variable
+  lineinfile:
+    path: /etc/environment
+    line: 'KUBECONFIG=/etc/rancher/k3s/k3s.yaml'
+    state: present
+    create: yes    

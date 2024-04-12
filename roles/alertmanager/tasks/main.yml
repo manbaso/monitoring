@@ -1,0 +1,83 @@
+---
+- name: Download alertmanager Alert Manager
+  get_url: 
+    url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+
+- name: Extract alertmanager Alert Manager
+  ansible.builtin.unarchive:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    dest: "/opt/"
+    remote_src: yes
+
+- name: Create alertmanager group
+  ansible.builtin.group:
+    name: "{{ alertmanager_group }}"
+    state: present
+
+- name: Create alertmanager user
+  ansible.builtin.user:
+    name: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+    shell: /bin/false
+    system: yes
+
+- name: Create directories for Alert Manager
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+  loop:
+    - /etc/alertmanager/templates
+    - /var/lib/alertmanager
+
+- name: Copy Alert Manager binary and configuration files
+  ansible.builtin.copy:
+    src: "/opt/alertmanager-{{ alertmanager_version }}.linux-amd64/alertmanager"
+    dest: /usr/local/bin/
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+    remote_src: yes
+    mode: 0755
+
+- name: Copy amtool binary to /usr/local/bin and set permissions
+  ansible.builtin.copy:
+    src: "/opt/alertmanager-{{ alertmanager_version }}.linux-amd64/amtool"
+    dest: "/usr/local/bin/amtool"
+    remote_src: yes
+    mode: "0755"
+
+- name: Ensure permissions are set for amtool binary
+  ansible.builtin.file:
+    path: "/usr/local/bin/amtool"
+    mode: "0755"
+
+
+
+
+- name: Create Config File for Alert Manager
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: /etc/alertmanager/alertmanager.yml
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+
+- name: Create systemd service for Alert Manager
+  ansible.builtin.template:
+    src: alertmanager.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+  
+
+- name: Start and enable Alert Manager service
+  ansible.builtin.service:
+    name: alertmanager
+    state: started
+    enabled: yes
+
+- name: Verify Alert Manager status
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: started
+
+

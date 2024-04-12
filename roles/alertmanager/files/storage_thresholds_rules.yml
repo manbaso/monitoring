@@ -1,0 +1,11 @@
+groups:
+  - name: StorageThreshold
+    rules:
+      - alert: HighStorageUsage
+        expr: 100 * (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes{mountpoint="/"})) > 50
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High storage usage on {{ $labels.instance }}"
+          description: "Storage usage on {{ $labels.instance }} is greater than 50%."

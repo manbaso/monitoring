@@ -1,0 +1,202 @@
+---
+
+- name: Download Prometheus release
+  get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v2.49.1/prometheus-2.49.1.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus.tar.gz"
+
+- name: Extract Prometheus archive
+  ansible.builtin.unarchive:
+    src: "/tmp/prometheus.tar.gz"
+    dest: "/tmp/"
+    remote_src: yes
+
+- name: Move Prometheus binaries to /usr/local/bin
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-2.49.1.linux-amd64/prometheus"
+    dest: "/usr/local/bin/"
+    remote_src: yes
+    mode: "0755"
+
+- name: Move promtool to /usr/local/bin
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-2.49.1.linux-amd64/promtool"
+    dest: "/usr/local/bin/"
+    remote_src: yes
+    mode: "0755"
+
+- name: Create Prometheus user
+  ansible.builtin.user:
+    name: prometheus
+    system: yes
+    shell: /bin/false
+
+- name: Create Prometheus directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: "0755"
+  loop:
+    - "/etc/prometheus"
+    - "/var/lib/prometheus"
+
+- name: Move Prometheus configuration file
+  ansible.builtin.copy:
+    src: "config.yml"
+    dest: "/etc/prometheus/prometheus.yml"
+    owner: prometheus
+    group: prometheus
+    mode: "0644"
+
+- name: Move consoles and console_libraries
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/prometheus/"
+    owner: prometheus
+    group: prometheus
+    remote_src: yes
+  loop:
+    - "/tmp/prometheus-2.49.1.linux-amd64/consoles/"
+    - "/tmp/prometheus-2.49.1.linux-amd64/console_libraries/"
+
+- name: Create Prometheus user
+  ansible.builtin.user:
+    name: prometheus
+    system: yes
+    shell: /bin/false
+
+- name: Change ownership of Prometheus directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: prometheus
+    group: prometheus
+    recurse: yes
+  loop:
+    - "/etc/prometheus"
+    - "/var/lib/prometheus"
+
+- name: Ensure /etc/alertmanager/templates directory exists
+  file:
+    path: /etc/prometheus/alerts
+    state: directory
+    mode: '0755'
+- name: Copy rules files
+  copy:
+    src: "{{ item.src }}"
+    dest: "/etc/prometheus/alerts/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: "cpu_thresholds_rules.yml", dest: "cpu_thresholds_rules.yml" }
+    - { src: "instance_shutdown_rules.yml", dest: "instance_shutdown_rules.yml" }
+    - { src: "memory_thresholds_rules.yml", dest: "memory_thresholds_rules.yml" }
+    - { src: "storage_thresholds_rules.yml", dest: "storage_thresholds_rules.yml" }        
+
+
+- name: Create empty /etc/systemd/system/prometheus.service file
+  ansible.builtin.file:
+    path: "/etc/systemd/system/prometheus.service"
+    state: touch
+
+- name: Create Prometheus systemd service file
+  ansible.builtin.blockinfile:
+    path: "/etc/systemd/system/prometheus.service"
+    block: |
+      [Unit]
+      Description=Prometheus
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      Type=simple
+      Restart=on-failure
+      RestartSec=5s
+      ExecStart=/usr/local/bin/prometheus \
+          --config.file /etc/prometheus/prometheus.yml \
+          --storage.tsdb.path /var/lib/prometheus/ \
+          --web.console.templates=/etc/prometheus/consoles \
+          --web.console.libraries=/etc/prometheus/console_libraries \
+          --web.listen-address=0.0.0.0:9090 \
+          --web.enable-lifecycle \
+          --log.level=info
+
+      [Install]
+      WantedBy=multi-user.target
+  
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Enable and start Prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    enabled: yes
+    state: started
+
+# - name: Download Node Exporter release
+#   get_url:
+#     url: "https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz"
+#     dest: "/tmp/node_exporter.tar.gz"
+
+# - name: Extract Node Exporter archive
+#   ansible.builtin.unarchive:
+#     src: "/tmp/node_exporter.tar.gz"
+#     dest: "/tmp/"
+
+# - name: Move Node Exporter binary to /usr/local/bin
+#   ansible.builtin.copy:
+#     src: "/tmp/node_exporter-1.7.0.linux-amd64/node_exporter"
+#     dest: "/usr/local/bin/"
+#     mode: "0755"
+
+# - name: Create Node Exporter user
+#   ansible.builtin.user:
+#     name: node_exporter
+#     system: yes
+#     shell: /bin/false
+
+# - name: Create empty /etc/systemd/system/node_exporter.service file
+#   ansible.builtin.file:
+#     path: "/etc/systemd/system/node_exporter.service"
+#     state: touch    
+
+# - name: Create Node Exporter systemd service file
+#   ansible.builtin.blockinfile:
+#     path: "/etc/systemd/system/node_exporter.service"
+#     block: |
+#       [Unit]
+#       Description=Node Exporter
+#       Wants=network-online.target
+#       After=network-online.target
+
+#       [Service]
+#       User=node_exporter
+#       Group=node_exporter
+#       Type=simple
+#       Restart=on-failure
+#       RestartSec=5s
+#       ExecStart=/usr/local/bin/node_exporter
+
+#       [Install]
+#       WantedBy=multi-user.target
+#   notify: reload systemd
+
+# - name: Reload systemd
+#   ansible.builtin.systemd:
+#     daemon_reload: yes
+
+# - name: Enable and start Node Exporter service
+#   ansible.builtin.systemd:
+#     name: node_exporter
+#     enabled: yes
+#     state: started
+
+
+    
+
+
+

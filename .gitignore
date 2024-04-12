@@ -1,0 +1,6 @@
+.*
+!/.gitignore
+project.pem
+terraform*
+rough*
+roles/prometheus/files/config.yml

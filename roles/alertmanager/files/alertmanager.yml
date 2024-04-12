@@ -1,0 +1,16 @@
+# alertmanager.yml
+global:
+  resolve_timeout: 1m
+route:
+  receiver: 'Mail-Alert'
+  group_by: [ alertname ]
+  repeat_interval: 1m
+  group_wait: 10s
+  group_interval: 10s
+
+receivers:
+- name: 'Mail-Alert'
+  slack_configs:
+  - api_url: https://hooks.slack.com/services/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
+    channel: '#prometheus'
+    send_resolved: true

@@ -1,0 +1,40 @@
+---
+
+- name: Install prerequisites
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - apt-transport-https
+    - software-properties-common
+
+- name: Add Grafana GPG key
+  ansible.builtin.get_url:
+    url: "https://apt.grafana.com/gpg.key"
+    dest: "/usr/share/keyrings/grafana.key"
+
+- name: Create empty /etc/apt/sources.list.d/grafana.list file
+  ansible.builtin.file:
+    path: "/etc/apt/sources.list.d/grafana.list"
+    state: touch    
+
+- name: Create Grafana sources.list file
+  ansible.builtin.copy:
+    content: "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main"
+    dest: "/etc/apt/sources.list.d/grafana.list"
+
+- name: Update package lists
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install Grafana
+  ansible.builtin.package:
+    name: grafana-nightly
+    state: present
+
+- name: Enable and start Grafana service
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: yes
+    state: restarted
+

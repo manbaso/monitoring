@@ -1,0 +1,9 @@
+---
+- name: Append content to /etc/hosts
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      # Custom entries for hosts
+      10.0.1.10   jenkins
+      10.0.1.11   monitoring
+      10.0.1.12   dev
